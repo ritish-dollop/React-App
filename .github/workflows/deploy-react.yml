@@ -1,0 +1,54 @@
+name: Deploy React App
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+      REMOTE_PATH: ${{ secrets.REMOTE_PATH }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: npm run build
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Create Directory
+        run: |
+          ssh -o StrictHostKeyChecking=no $SSH_USERNAME@$SSH_HOST \
+          "mkdir -p $REMOTE_PATH"
+
+      - name: Clear Existing Files
+        run: |
+          ssh -o StrictHostKeyChecking=no $SSH_USERNAME@$SSH_HOST \
+          "rm -rf $REMOTE_PATH/*"
+
+      - name: Upload Build
+        run: |
+          scp -o StrictHostKeyChecking=no -r dist/* \
+          $SSH_USERNAME@$SSH_HOST:$REMOTE_PATH/
